@@ -2,13 +2,18 @@ import cv2
 import numpy as np
 
 from skimage.segmentation import slic
+from skimage.segmentation import find_boundaries
 
 import greyscale_img
 import derivative_analysis
 
-def run_slic(img, n=120, c=20):
+def run_slic(img, n=120, c=40):
     segments = slic(img, n_segments=n, compactness=c)
     return segments
+
+def run_find_boundaries(img):
+    boundaries = find_boundaries(img)
+    return boundaries
 
 def slic_averager(img, segments):
     h = {}
@@ -65,18 +70,20 @@ def segmentation_analysis():
     img = cv2.imread("./images/birdo.jpg", cv2.IMREAD_UNCHANGED)
     grey_img = greyscale_img.generate(img)
 
-    segments = run_slic(grey_img)
-    slic_avg_img, var_hash = slic_averager(grey_img, segments)
-    detail_level_img = detail_level_map(grey_img, segments, var_hash)
+    #segments = run_slic(grey_img)
+    #slic_avg_img, var_hash = slic_averager(grey_img, segments)
+    #detail_level_img = detail_level_map(grey_img, segments, var_hash)
 
-    #segments_color = run_slic(img)
-    #slic_avg_img_color = slic_averager(grey_img, segments_color)
+    segments_color = run_slic(img)
+    segments_grey = run_slic(grey_img)
+    slic_avg_img_color, _ = slic_averager(grey_img, segments_color)
+    slic_avg_img_grey, _ = slic_averager(grey_img, segments_grey)
 
     #intensity_img = intensity_map(img)
 
-    cv2.imwrite("./outputs/birdo_slic_avg.png", slic_avg_img)
-    cv2.imwrite("./outputs/birdo_detail_level_map.png", detail_level_img)
-    #cv2.imwrite("./outputs/birdo_slic_avg_color.png", slic_avg_img_color)
+    cv2.imwrite("./outputs/birdo_slic_avg.png", slic_avg_img_grey)
+    #cv2.imwrite("./outputs/birdo_detail_level_map.png", detail_level_img)
+    cv2.imwrite("./outputs/birdo_slic_avg_color.png", slic_avg_img_color)
     #cv2.imwrite("./outputs/birdo_intensity_map.png", intensity_img)
 
 
