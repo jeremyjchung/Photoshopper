@@ -22,14 +22,64 @@ def detect_end_points(img):
                     matrix[i,j] = 255
                     points.append((i,j))
 
-    return matrix, np.array(points)
+    return matrix, points
+
+def dilation(img):
+    img_plus_border = np.zeros((img.shape[0]+2, img.shape[1]+2))
+    img_plus_border[1:img_plus_border.shape[0]-1, 1:img_plus_border.shape[1]-1] = np.array(img)
+
+    for i in range(2, img_plus_border.shape[0]-2):
+        for j in range(2, img_plus_border.shape[1]-2):
+            if img_plus_border[i,j] > 0:
+                for m in range(i-2, i+3):
+                    for n in range(j-2, j+3):
+                        img_plus_border[m,n] = 255
+
+    return img_plus_border[1:img_plus_border.shape[0]-1, 1:img_plus_border.shape[1]-1]
+
+def guess_edge_points(end_points, edge_img, img, window=10):
+    matrix = np.array(edge_img)
+    dilation_matrix = dilation(edge_img)
+
+    for i in range(0, len(end_points)):
+        r, c = end_points[i][0], end_points[i][1]
+        p = [r,c,img[r,c]]
+        best_point, best_v = None, 100000000000
+        c_window = min(r, c, img.shape[0]-r-1, img.shape[1]-c-1, window)
+
+        right_c, left_c = c+c_window, c-c_window
+        up_r, down_r = r-c_window, r+c_window
+
+        for i in range(r-c_window, r+c_window):
+            p1, p2 = np.array([i,right_c,img[i,right_c]]), np.array([i,left_c,img[i,left_c]])
+            v1, v2 = np.linalg.norm(p-p1), np.linalg.norm(p-p2)
+
+            if dilation_matrix[p1[0],p1[1]] == 0 and v1 < best_v:
+                best_v, best_point = v1, (i,right_c)
+            if dilation_matrix[p2[0],p2[1]] == 0 and v2 < best_v:
+                best_v, best_point = v2, (i,left_c)
+
+        for j in range(c-c_window, c+c_window):
+            p1, p2 = np.array([up_r,j,img[up_r,j]]), np.array([down_r,j,img[down_r,j]])
+            v1, v2 = np.linalg.norm(p-p1), np.linalg.norm(p-p2)
+
+            if dilation_matrix[p1[0],p1[1]] == 0 and v1 < best_v:
+                best_v, best_point = v1, (up_r,j)
+            if dilation_matrix[p2[0],p2[1]] == 0 and v2 < best_v:
+                best_v, best_point = v2, (down_r,j)
+
+        if best_point != None:
+            end_points.append(best_point)
+            matrix[best_point[0],best_point[1]] = 255
+
+    return matrix
 
 # http://www.cvc.uab.es/~asappa/publications/C__SITIS_2006.pdf
 # end_points = nx2 array, img = grey scale img
 def global_linking(end_points, img):
-    tri = Delaunay(end_points)
+    tri = Delaunay(np.array(end_points))
     simplices = tri.simplices
-    graph = np.full((end_points.shape[0], end_points.shape[0]), -1)
+    graph = np.full((len(end_points), len(end_points)), -1)
 
     for i in range(0, simplices.shape[0]):
         v1, v2, v3 = simplices[i,0], simplices[i,1], simplices[i,2]
@@ -41,7 +91,7 @@ def global_linking(end_points, img):
         graph[v3,v1], graph[v3,v2] = graph[v1,v3], graph[v2,v3]
 
     mst = np.full(graph.shape, -1)
-    n = int(end_points.shape[0] * (end_points.shape[0]-1) / 2)
+    n = int(len(end_points) * (len(end_points)-1) / 2)
     edges = np.zeros((n), dtype=[('node1', int), ('node2', int), ('distance', float)])
 
     for i in range(0, graph.shape[0]):
@@ -123,12 +173,17 @@ def connect_diagonal_pixels(img):
 
     return img_plus_border[1:img_plus_border.shape[0]-1,1:img_plus_border.shape[1]-1]
 
-def global_iterations(canny_img, img, iterations=10):
+def global_iterations(canny_img, img, iterations=10, start_guess=5):
     final_img = np.array(canny_img)
+    end_points_img, end_points = None, None
 
     for i in range(0, iterations):
         final_img = connect_diagonal_pixels(final_img)
         end_points_img, end_points = detect_end_points(final_img)
+
+        if i >= start_guess:
+            final_img = guess_edge_points(end_points, final_img, img)
+
         global_linking_img = global_linking(end_points, img)
         final_img = combine_imgs(final_img, global_linking_img)
 
