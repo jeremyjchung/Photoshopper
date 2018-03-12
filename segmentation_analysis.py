@@ -74,16 +74,16 @@ def segmentation_analysis():
     #slic_avg_img, var_hash = slic_averager(grey_img, segments)
     #detail_level_img = detail_level_map(grey_img, segments, var_hash)
 
-    segments_color = run_slic(img)
+    #segments_color = run_slic(img)
     segments_grey = run_slic(grey_img)
-    slic_avg_img_color, _ = slic_averager(grey_img, segments_color)
+    #slic_avg_img_color, _ = slic_averager(grey_img, segments_color)
     slic_avg_img_grey, _ = slic_averager(grey_img, segments_grey)
 
     #intensity_img = intensity_map(img)
 
-    cv2.imwrite("./outputs/birdo_slic_avg.png", slic_avg_img_grey)
+    cv2.imwrite("./outputs/slic.png", slic_avg_img_grey)
     #cv2.imwrite("./outputs/birdo_detail_level_map.png", detail_level_img)
-    cv2.imwrite("./outputs/birdo_slic_avg_color.png", slic_avg_img_color)
+    #cv2.imwrite("./outputs/birdo_slic_avg_color.png", slic_avg_img_color)
     #cv2.imwrite("./outputs/birdo_intensity_map.png", intensity_img)
 
 

@@ -3,7 +3,9 @@ import fractions
 import math
 import numpy as np
 
+from collections import deque
 from scipy.spatial import Delaunay
+from skimage.segmentation import slic
 
 def canny_edge_detector(grey_img, threshold1=75, threshold2=150):
     return cv2.Canny(grey_img, threshold1, threshold2)
@@ -173,7 +175,7 @@ def connect_diagonal_pixels(img):
 
     return img_plus_border[1:img_plus_border.shape[0]-1,1:img_plus_border.shape[1]-1]
 
-def global_iterations(canny_img, img, iterations=10, start_guess=5):
+def global_iterations(canny_img, img, iterations=10, start_guess=6):
     final_img = np.array(canny_img)
     end_points_img, end_points = None, None
 
@@ -187,17 +189,120 @@ def global_iterations(canny_img, img, iterations=10, start_guess=5):
         global_linking_img = global_linking(end_points, img)
         final_img = combine_imgs(final_img, global_linking_img)
 
+    final_img = fill_details(final_img)
     return final_img
 
-def analysis():
-    img = cv2.imread("./images/birdo.jpg", 0)
-    canny_img = canny_edge_detector(img)
-    final_img = global_iterations(canny_img, img)
+def fill_details(edge_img):
+    matrix = np.array(edge_img)
 
-    cv2.imwrite("./outputs/canny.png", canny_img)
-    #cv2.imwrite("./outputs/end_points.png", end_points_img)
-    #cv2.imwrite("./outputs/global_link.png", global_linking_img)
-    cv2.imwrite("./outputs/final.png", final_img)
+    for i in range(1, edge_img.shape[0]-1):
+        for j in range(1, edge_img.shape[1]-1):
+            if edge_img[i,j] == 0:
+                if edge_img[i-1,j] > 0 and edge_img[i+1,j] > 0:
+                    matrix[i,j] = 255
+                elif edge_img[i,j-1] > 0 and edge_img[i,j+1] > 0:
+                    matrix[i,j] = 255
+
+    return matrix
+
+def blacken_background(edge_img):
+    matrix = np.full(edge_img.shape, 255)
+    seen = np.zeros(edge_img.shape)
+    queue = deque([(0,0), (edge_img.shape[0]-1,0), (0,edge_img.shape[1]-1), (edge_img.shape[0]-1,edge_img.shape[1]-1)])
+
+    while queue:
+        p = queue.popleft()
+
+        if p[0] < 0 or p[1] < 0 or p[0] >= edge_img.shape[0] or p[1] >= edge_img.shape[1]:
+            continue
+        if seen[p[0],p[1]] == 1:
+            continue
+        if edge_img[p[0],p[1]] == 0:
+            matrix[p[0],p[1]] = 0
+            queue.append((p[0],p[1]+1)), queue.append((p[0],p[1]-1))
+            queue.append((p[0]-1,p[1])), queue.append((p[0]+1,p[1]))
+
+        seen[p[0],p[1]] = 1
+
+    return matrix
+
+def prune_edges(edge_img):
+    labels = np.zeros(edge_img.shape)
+    matrix = np.zeros(edge_img.shape)
+    h = {}
+    count = 1
+    h[count] = 0
+
+    for i in range(0, edge_img.shape[0]):
+        for j in range(0, edge_img.shape[1]):
+            queue = deque([(i,j)])
+
+            while queue:
+                p = queue.popleft()
+
+                if p[0] < 0 or p[1] < 0 or p[0] >= edge_img.shape[0] or p[1] >= edge_img.shape[1]:
+                    continue
+                if labels[p[0],p[1]] > 0 or edge_img[p[0],p[1]] == 0:
+                    continue
+
+                h[count] += 1
+                labels[p[0],p[1]] = count
+                queue.append((p[0],p[1]+1)), queue.append((p[0],p[1]-1))
+                queue.append((p[0]-1,p[1])), queue.append((p[0]+1,p[1]))
+
+            if h[count] > 0:
+                count += 1
+                h[count] = 0
+
+    best_label, best_count = 1, h[1]
+
+    for k, v in h.items():
+        if v > best_count:
+            best_count = v
+            best_label = k
+
+    for i in range(0, edge_img.shape[0]):
+        for j in range(0, edge_img.shape[1]):
+            if labels[i,j] == best_label:
+                matrix[i,j] = 255
+
+    return matrix
+
+## not effective ....
+def segmentation_prune(filled_img, img, threshold=0.15, n=120, c=40):
+    matrix = np.zeros(filled_img.shape)
+    segments = slic(img, n_segments=n, compactness=c)
+    h = {}    ## segment label => (total pixels, count of 255 pixels)
+
+    for i in range(0, segments.shape[0]):
+        for j in range(0, segments.shape[1]):
+            s = segments[i,j]
+            if s not in h:
+                h[s] = np.array([0,0])
+            if filled_img[i,j] > 0:
+                h[s][1] += 1
+            h[s][0] += 1
+
+    for i in range(0, filled_img.shape[0]):
+        for j in range(0, filled_img.shape[1]):
+            if filled_img[i,j] > 0:
+                s = segments[i,j]
+                if h[s][1] / h[s][0] >= threshold:
+                    matrix[i,j] = 255
+
+    return matrix
+
+def analysis_v1():
+    img = cv2.imread("./images/doggo.jpg", 0)
+    canny_img = canny_edge_detector(img)
+    closed_shape = global_iterations(canny_img, img)
+    pruned_edges = prune_edges(closed_shape)
+    filled_in = blacken_background(pruned_edges)
+
+    cv2.imwrite("./outputs/v1/canny.png", canny_img)
+    cv2.imwrite("./outputs/v1/closed.png", closed_shape)
+    cv2.imwrite("./outputs/v1/closed_pruned.png", pruned_edges)
+    cv2.imwrite("./outputs/v1/filled.png", filled_in)
 
 if __name__ == '__main__':
-    analysis()
+    analysis_v1()

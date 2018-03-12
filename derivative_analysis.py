@@ -237,7 +237,7 @@ def display(img, descriptor):
 
 def derivative_analysis():
     img = cv2.imread("./images/birdo.jpg", cv2.IMREAD_UNCHANGED)
-    grey_img = greyscale_img.generate(img)
+    grey_img = cv2.imread("./images/birdo.jpg", 0)
     gauss_img = gaussian_smoother(grey_img)
     segments = segmentation_analysis.run_slic(grey_img)
 
@@ -254,16 +254,16 @@ def derivative_analysis():
     marked_edges, marker_count_dict = mark_edges(xy_deriv_color)
     pruned_edges = prune_marked_edges(marked_edges, marker_count_dict)
 
-    x_filter = x_deriv_filter(x_deriv_color)
-    y_filter = y_deriv_filter(y_deriv_color)
-    xy_filter = xy_deriv_filter(x_filter, y_filter)
+    #x_filter = x_deriv_filter(x_deriv_color)
+    #y_filter = y_deriv_filter(y_deriv_color)
+    #xy_filter = xy_deriv_filter(x_filter, y_filter)
     #poi_color_img, _ = points_of_interest(xy_deriv_color)
 
 
     #cv2.imwrite("./outputs/birdo_gauss.png", gauss_img)
     #cv2.imwrite("./outputs/birdo_x_deriv.png", x_deriv)
     #cv2.imwrite("./outputs/birdo_y_deriv.png", y_deriv)
-    cv2.imwrite("./outputs/birdo_xy_filter.png", xy_filter)
+    #cv2.imwrite("./outputs/birdo_xy_filter.png", xy_filter)
     cv2.imwrite("./outputs/birdo_xy_deriv_color.png", xy_deriv_color)
     cv2.imwrite("./outputs/birdo_marked_edges.png", pruned_edges)
     #cv2.imwrite("./outputs/birdo_xy_deriv.png", xy_deriv)
